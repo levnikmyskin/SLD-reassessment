@@ -265,5 +265,6 @@ if __name__ == '__main__':
     dataset_generator = rcv1_binary_dataset(rcv1_helper)
     with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
         for x, y, class_name in dataset_generator:
+            logging.info(f"Running experiment for class {class_name}")
             for classifier in classifiers:
                 run_n_iterations(ITERATIONS_NUMBER, x, y, classifier, False, "rcv1", p, N_CLASSES, class_name, 100)

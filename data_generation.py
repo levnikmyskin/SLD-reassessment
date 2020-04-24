@@ -18,7 +18,7 @@ def randomly_modify_prevalences(x: np.array, y: np.array, train_split=1000, test
     labels = set(y)
     train_groups = [(y == label).nonzero()[0] for label in labels]
 
-    # Step two: generate the vectors of random probabilities and the new sample
+    # Step two: generate the vectors of random probabilities and draw the new sample
     new_training_sample = __new_random_sample(train_groups, len(labels), train_split)
 
     # Filter out documents we have already taken for training set
