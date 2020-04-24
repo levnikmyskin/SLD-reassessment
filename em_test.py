@@ -14,6 +14,7 @@ from multiprocessing import Pool
 from data_generation import randomly_modify_prevalences
 from load_data import get_measures_from_singlehist_measures
 from datetime import date
+from dataset_helpers import take, rcv1_binary_dataset, Rcv1Helper
 
 from em import em
 logging.basicConfig(filename="computation.log", level=logging.INFO, format='%(levelname)s:%(message)s')
@@ -126,25 +127,14 @@ def batch(batch_name, x_train, y_train, x_test, y_test):
         p.starmap(run_experiment, [(batch_name, cls, x_train, y_train, x_test, y_test) for cls in classifiers])
 
 
-def generate_n_randomly_modified_prevalence(n, x_tr, y_tr, x_te, y_te, train_sample, test_sample):
+def generate_n_randomly_modified_prevalence(n, x, y, train_sample, test_sample):
     for i in range(n):
-        yield randomly_modify_prevalences(x_tr, y_tr, train_sample), randomly_modify_prevalences(x_te, y_te,
-                                                                                                 test_sample)
+        yield randomly_modify_prevalences(x, y, train_sample, test_sample)
 
 
-def take(n, iterable):
-    # Return first n items of the iterable as a list
-    return list(itertools.islice(iterable, n))
-
-
-def flatten(list_of_lists):
-    # Flatten one level of nesting
-    return itertools.chain.from_iterable(list_of_lists)
-
-
-def run_n_iterations(n, x_train, y_train, x_test, y_test, classifier_name, multiclass, dataset_name, pool, n_classes, class_name="", take_n=50):
+def run_n_iterations(n, x, y, classifier_name, multiclass, dataset_name, pool, n_classes, class_name="", take_n=50):
     logging.info(f"Running {n} iterations for classifier {classifier_name}")
-    gen = generate_n_randomly_modified_prevalence(n, x_train, y_train, x_test, y_test, 7000, 10000)
+    gen = generate_n_randomly_modified_prevalence(n, x, y, 1000, 1000)
     measures = list()
     i = 0
     while data := take(take_n, gen):
@@ -162,7 +152,7 @@ def run_n_iterations(n, x_train, y_train, x_test, y_test, classifier_name, multi
         i += take_n
 
     logging.info(f"Saving measures for classifier {classifier_name}")
-    with open(f'./pickles/measures/measures_{n}_{dataset_name}{class_name}_{n_classes}_{classifier_name.replace(" ", "-")}_{date.today().strftime("%d-%m-%y")}.pkl', 'wb') as f:
+    with open(f'./pickles/measures_new_experiments/measures_{n}_{dataset_name}{class_name}_{n_classes}_{classifier_name.replace(" ", "-")}_{date.today().strftime("%d-%m-%y")}.pkl', 'wb') as f:
         pickle.dump(measures, f)
 
 
@@ -181,7 +171,7 @@ def run_n_iterations_no_parallel(n, x_train, y_train, x_test, y_test, classifier
         pickle.dump(measures, f)
 
 
-def rcv1_dataset(index='GCAT'):
+def rcv1_dataset():
     dataset = fetch_rcv1()
     index_class = list(dataset.target_names).index(index)
     y = np.asarray(dataset.target[:, index_class].todense()).squeeze()
@@ -264,17 +254,16 @@ if __name__ == '__main__':
     ]
 
     ITERATIONS_NUMBER = 500
-    N_CLASSES = int(sys.argv[1])
-    class_name = sys.argv[2] if len(sys.argv) >= 3 else ""
-    full_x_train, full_x_test, full_y_train, full_y_test, dataset_name = twentyng_dataset_by_class(class_name)
+    N_CLASSES = 2
+    # N_CLASSES = int(sys.argv[1])
+    # class_name = sys.argv[2] if len(sys.argv) >= 3 else ""
+    # full_x_train, full_x_test, full_y_train, full_y_test, dataset_name = twentyng_dataset_by_class(class_name)
     # for classifier in classifiers:
     #     run_n_iterations_no_parallel(ITERATIONS_NUMBER, full_x_train, full_y_train, full_x_test, full_y_test, classifier, False,
     #                                  dataset_name, N_CLASSES, class_name)
+    rcv1_helper = Rcv1Helper()
+    dataset_generator = rcv1_binary_dataset(rcv1_helper)
     with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
-        for classifier in classifiers:
-            run_n_iterations(ITERATIONS_NUMBER, full_x_train, full_y_train, full_x_test, full_y_test, classifier, False,
-                             dataset_name, p, N_CLASSES, class_name, 100)
-
-    # TODO scartare classi con meno di 900. Per ogni classe rimasta prendiamo esattamente 900 documenti a random.
-    # TODO subsampling come prima andando a prendere 1000 documenti di training e 1000 di test
-    # TODO subsampling random va fatto su tutto il dataset, assicurarsi che training e test non collidano
+        for x, y, class_name in dataset_generator:
+            for classifier in classifiers:
+                run_n_iterations(ITERATIONS_NUMBER, x, y, classifier, False, "rcv1", p, N_CLASSES, class_name, 100)

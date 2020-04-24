@@ -21,6 +21,10 @@ class Rcv1Helper:
     def children(self, label) -> {str}:
         return self.children_hierarchy[label]
 
+    def label_indices(self, labels: [str]):
+        target_names = list(self.dataset.target_names)
+        return [target_names.index(label) for label in labels]
+
     def documents_per_class_rcv1(self) -> [(str, int)]:
         """
         Computes the number of documents for each RCV1 class.
@@ -66,7 +70,7 @@ class Rcv1Helper:
 
         return [(name, val) for name, val in single_labels.items()]
 
-    def hierarchical_single_labels_indices(self, label=None) -> [{str: np.array}]:
+    def hierarchical_single_labels_indices(self, label=None) -> [(str, np.array)]:
         """
         Returns the indices of `label` single-label multi-class document. If `label` is None, returns the indices
         for all labels.
@@ -74,10 +78,10 @@ class Rcv1Helper:
         """
         target_names = list(self.dataset.target_names)
         if label:
-            yield {label: self.__single_label_indices(label, target_names)}
+            yield label, self.__single_label_indices(label, target_names)[0]
         else:
             for label in self.parent_hierarchy.keys():
-                yield {label: self.__single_label_indices(label, target_names)}
+                yield label, self.__single_label_indices(label, target_names)[0]
 
     def __single_label_indices(self, label, target_names):
         parents = self.parents(label)
@@ -98,7 +102,7 @@ class Rcv1Helper:
 
         parent_hier = {}
         pattern = re.compile(r'parent: (?P<parent>[\w\d]+)\s+child: (?P<child>[\w\d]+)')
-        with open('rcv1_hierarchy', 'r') as f:
+        with open('./rcv1_hierarchy', 'r') as f:
             temp_hier = {}
             for line in f:
                 m = pattern.search(line)

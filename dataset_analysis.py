@@ -1,6 +1,6 @@
 from em_test import fetch_20newsgroups_vectorized
 import pandas as pd
-from rcv1_helper import Rcv1Helper
+from dataset_helpers import Rcv1Helper
 
 
 def document_per_class_20ng(twentyng):
