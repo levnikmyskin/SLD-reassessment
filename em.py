@@ -1,7 +1,65 @@
 import numpy as np
+import logging
+from collections import namedtuple
+
+from sklearn.metrics import brier_score_loss
+from sklearn.preprocessing import MultiLabelBinarizer
+
+from metrics import smoothmacroF1, isometric_brier_decomposition, isomerous_brier_decomposition
+
+History = namedtuple('History', ('posteriors', 'priors', 'y', 'iteration', 'stopping_criterium'))
+MeasureSingleHistory = namedtuple('MeasureSingleHistory', (
+    'soft_acc', 'soft_f1', 'abs_errors', 'test_priors', 'train_priors', 'predict_priors', 'brier',
+    'isometric_ref_loss', 'isometric_cal_loss', 'isomerous_ref_loss', 'isomerous_cal_loss'
+))
 
 
-def em(y, posteriors_zero, priors_zero, epsilon=1e-6, positive_class=1):
+def get_measures_single_history(history: History, multi_class) -> MeasureSingleHistory:
+    y = history.y
+    y_bin = MultiLabelBinarizer().fit_transform(np.expand_dims(y, 1))
+
+    soft_acc = soft_accuracy(y, history.posteriors)
+    f1 = smoothmacroF1(y_bin, history.posteriors)
+
+    if multi_class:
+        test_priors = np.mean(y_bin, 0)
+        abs_errors = abs(test_priors - history.priors)
+        train_priors = history.priors
+        predict_priors = np.mean(history.posteriors, 0)
+        brier = 0
+    else:
+        test_priors = np.mean(y_bin, 0)[1]
+        abs_errors = abs(test_priors - history.priors[1])
+        train_priors = history.priors[1]
+        predict_priors = np.mean(history.posteriors[:, 1])
+        brier = brier_score_loss(y, history.posteriors[:, 1])
+
+    isometric_cal_loss, isometric_ref_loss = isometric_brier_decomposition(y, history.posteriors)
+    isomerous_em_cal_loss, isomerous_em_ref_loss = isomerous_brier_decomposition(y, history.posteriors)
+
+    return MeasureSingleHistory(
+        soft_acc, f1, abs_errors, test_priors, train_priors, predict_priors, brier, isometric_ref_loss,
+        isometric_cal_loss, isomerous_em_ref_loss, isomerous_em_cal_loss
+    )
+
+
+def soft_accuracy(y, posteriors):
+    return sum(posteriors[y == c][:, c].sum() for c in range(posteriors.shape[1])) / posteriors.sum()
+
+
+def soft_f1(y, posteriors):
+    cont_matrix = {
+        'TPM': posteriors[y == 1][:, 1].sum(),
+        'TNM': posteriors[y == 0][:, 0].sum(),
+        'FPM': posteriors[y == 0][:, 1].sum(),
+        'FNM': posteriors[y == 1][:, 0].sum()
+    }
+    precision = cont_matrix['TPM'] / (cont_matrix['TPM'] + cont_matrix['FPM'])
+    recall = cont_matrix['TPM'] / (cont_matrix['TPM'] + cont_matrix['FNM'])
+    return 2 * (precision * recall / (precision + recall))
+
+
+def em(y, posteriors_zero, priors_zero, epsilon=1e-6, multi_class=False):
     """
     Implements the prior correction method based on EM presented in:
     "Adjusting the Outputs of a Classifier to New a Priori Probabilities: A Simple Procedure"
@@ -23,13 +81,13 @@ def em(y, posteriors_zero, priors_zero, epsilon=1e-6, positive_class=1):
     posteriors_s = np.copy(posteriors_zero)
     val = 2 * epsilon
     history = list()
-    acc = np.mean((y == positive_class) == (posteriors_zero[:, positive_class] > 0.5))
-    rec = np.sum(np.logical_and((y == positive_class), (posteriors_zero[:, positive_class] > 0.5))) / np.sum(
-        y == positive_class)
-    prec = np.sum(np.logical_and((y == positive_class), (posteriors_zero[:, positive_class] > 0.5))) / np.sum(
-        posteriors_zero[:, positive_class] > 0.5)
-    history.append((s, list(priors_s), 1, acc, prec, rec))
-    while not val < epsilon:
+    history.append(get_measures_single_history(History(posteriors_zero, priors_zero, y, s, 1), multi_class))
+    logging.debug(f"Starting EM computation, multiclass: {multi_class}")
+    while not val < epsilon and s < 999:
+        # M step
+        priors_s_minus_one = priors_s.copy()
+        priors_s = posteriors_s.mean(0)
+
         # E step
         ratios = priors_s / priors_zero
         denominators = 0
@@ -38,21 +96,13 @@ def em(y, posteriors_zero, priors_zero, epsilon=1e-6, positive_class=1):
         for c in range(priors_zero.shape[0]):
             posteriors_s[:, c] = ratios[c] * posteriors_zero[:, c] / denominators
 
-        acc = np.mean((y == positive_class) == (posteriors_s[:, positive_class] > 0.5))
-        rec = np.sum(np.logical_and((y == positive_class), (posteriors_s[:, positive_class] > 0.5))) / np.sum(
-            y == positive_class)
-        prec = np.sum(np.logical_and((y == positive_class), (posteriors_s[:, positive_class] > 0.5))) / np.sum(
-            posteriors_s[:, positive_class] > 0.5)
-        priors_s_minus_one = priors_s.copy()
-
-        # M step
-        priors_s = posteriors_s.mean(0)
-
         # check for stop
         val = 0
         for i in range(len(priors_s_minus_one)):
             val += abs(priors_s_minus_one[i] - priors_s[i])
+
+        logging.debug(f"Em iteration: {s}; Val: {val}")
         s += 1
-        history.append((s, list(priors_s), val, acc, prec, rec))
+        history.append(get_measures_single_history(History(posteriors_s, priors_s, y, s, val), multi_class))
 
     return posteriors_s, priors_s, history

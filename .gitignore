@@ -1,0 +1,8 @@
+plots
+pickles
+.ipynb_checkpoints
+*.png
+*.pkl
+*.tex
+*.log
+*.tsv
