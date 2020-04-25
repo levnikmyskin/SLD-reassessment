@@ -16,7 +16,13 @@ MeasureSingleHistory = namedtuple('MeasureSingleHistory', (
 
 def get_measures_single_history(history: History, multi_class) -> MeasureSingleHistory:
     y = history.y
-    y_bin = MultiLabelBinarizer().fit_transform(np.expand_dims(y, 1))
+
+    # TODO THIS IS A WORKAROUND, ONLY WORKS FOR BINARY CASES
+    # If we have no positives or no negatives, we need to specify the 0,1 classes, else MLB will return a 1D array
+    if not y.any() or y.all():
+        y_bin = MultiLabelBinarizer(classes=[0, 1]).fit_transform(np.expand_dims(y, 1))
+    else:
+        y_bin = MultiLabelBinarizer().fit_transform(np.expand_dims(y, 1))
 
     soft_acc = soft_accuracy(y, history.posteriors)
     f1 = smoothmacroF1(y_bin, history.posteriors)

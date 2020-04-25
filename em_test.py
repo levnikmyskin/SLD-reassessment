@@ -1,5 +1,3 @@
-import itertools
-import sys
 import pickle
 import numpy as np
 import logging
@@ -145,7 +143,7 @@ def run_n_iterations(n, x, y, classifier_name, multiclass, dataset_name, pool, n
         # object. We can save these to disk, and later compute a mean with the appropriate function in load_data.py
         measures.append(pool.starmap(
             em_experiment,
-            [(classifier_name, new_xtr, new_ytr, new_xte, new_yte, multiclass) for (new_xtr, new_ytr), (new_xte, new_yte) in
+            [(classifier_name, new_xtr, new_ytr, new_xte, new_yte, multiclass) for new_xtr, new_ytr, new_xte, new_yte in
              data],
             take_n // 10
         ))
@@ -236,7 +234,7 @@ def init_classifiers(name):
     elif name == 'Calibrated Random Forest':
         return CalibratedClassifierCV(RandomForestClassifier(), ensemble=False)
     elif name == 'Logistic Regression':
-        LogisticRegression()
+        return LogisticRegression()
     elif name == 'Calibrated Logistic Regression':
         return CalibratedClassifierCV(LogisticRegression(), ensemble=False)
 
@@ -265,6 +263,13 @@ if __name__ == '__main__':
     dataset_generator = rcv1_binary_dataset(rcv1_helper)
     with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
         for x, y, class_name in dataset_generator:
+            # TODO REMOVE THIS, IT'S JUST FOR NOW
+            if any(done == class_name for done in ['C11', 'C13', 'C151', 'C1511', 'C152', 'C171', 'C172', 'C181']):
+                continue
+            # TODO REMOVE ABOVE
+
+            if len((set_y := set(y))) != 2:
+                logging.error(f"Y has only one class! Set of labels: {set_y}; class: {class_name}")
             logging.info(f"Running experiment for class {class_name}")
             for classifier in classifiers:
                 run_n_iterations(ITERATIONS_NUMBER, x, y, classifier, False, "rcv1", p, N_CLASSES, class_name, 100)
