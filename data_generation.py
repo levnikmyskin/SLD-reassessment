@@ -25,10 +25,11 @@ def randomly_modify_prevalences(x: np.array, y: np.array, train_split=1000, test
     mask = np.ones_like(y, dtype=np.bool)
     mask[new_training_sample] = False
     y_test = y[mask]
+    x_test = x[mask]
     test_groups = [(y_test == label).nonzero()[0] for label in labels]
     new_test_sample = __new_random_sample(test_groups, len(labels), test_split)
 
-    return x[new_training_sample], y[new_training_sample], x[new_test_sample], y[new_test_sample]
+    return x[new_training_sample], y[new_training_sample], x_test[new_test_sample], y_test[new_test_sample]
 
 
 def subsample_dataset_random_prev(dataset, sample_length: int) -> ((np.array, np.array), (np.array, np.array)):
@@ -44,7 +45,7 @@ def subsample_dataset_random_prev(dataset, sample_length: int) -> ((np.array, np
 def __new_random_sample(groups, labels_len, sample_size):
     # For details on what's happening here, see
     # https://stackoverflow.com/questions/44613347/multidimensional-array-for-random-choice-in-numpy
-    rand_num = np.random.randint(1, 100, labels_len)
+    rand_num = np.random.default_rng().integers(1, 100, labels_len)
     rand_prob_vector = rand_num / rand_num.sum()
     lens = np.array([el.shape[0] for el in groups])
     random_vec = np.repeat(np.divide(rand_prob_vector, lens), lens)
