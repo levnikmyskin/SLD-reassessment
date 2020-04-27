@@ -1,5 +1,5 @@
 from load_data import *
-from em_test import flatten
+from dataset_helpers.utils import flatten
 import pickle
 import sys
 import io
@@ -79,27 +79,33 @@ def format_percentages(perc):
 
 def write_latex_table(buffer, measure, isomerous=True):
     averages = dict()
-    for clf_name, meas in measure:
-        for i, m in enumerate(meas):
-            assert type(m) is Measures, f"Measure {i} for clf {clf_name} is not of type Measures. Got {m}"
-        measure_mean = get_measures_mean_across_iterations(meas)
+    classes_group = itertools.groupby(measure, key=lambda c: c[0])
+    classes_measures = []
+    for clf_name, group_ in classes_group:
+        means = []
+        for _, group_data in group_:
+            means.append(get_measures_mean_across_experiments(group_data))
+        classes_measures.append((clf_name, get_measures_mean_across_experiments(means)))
+
+    for clf_name, measure_mean in classes_measures:
+        assert type(measure_mean) is Measures, f"Measure {i} for clf {clf_name} is not of type Measures. Got {measure_mean}"
         shortened_name = ''.join(c for c in clf_name.replace('Calibrated', '') if c.isupper())  # shorten classifier name by taking the two capitalized letters
         nae, em_nae, brier, em_brier, isom_cal, isom_em_cal, isom_ref, isom_em_ref = get_latex_measures(measure_mean, isomerous)
         add_meas_to_averages(averages, nae, em_nae, brier, em_brier, isom_cal, isom_em_cal, isom_ref, isom_em_ref)
 
         buffer.write(
-            f"& {shortened_name} & {nae:.3f} & {em_nae:.3f} & {format_percentages(error_reduction_percentage(nae, em_nae))}\\%" 
-            f"& {brier:.3f} & {em_brier:.3f} & {format_percentages(error_reduction_percentage(brier, em_brier))}\\%"
-            f"& {isom_cal:.3f} & {isom_em_cal:.3f} & {format_percentages(error_reduction_percentage(isom_cal, isom_em_cal))}\\%"
-            f"& {isom_ref:.3f} & {isom_em_ref:.3f} & {format_percentages(error_reduction_percentage(isom_ref, isom_em_ref))}\\% \\\\"
+            f"& {shortened_name} & {('%.3f' % nae)[1:]} & {('%.3f' % em_nae)[1:]} & {format_percentages(error_reduction_percentage(nae, em_nae))}\\%" 
+            f"& {('%.3f' % brier)[1:]} & {('%.3f' % em_brier)[1:]} & {format_percentages(error_reduction_percentage(brier, em_brier))}\\%"
+            f"& {('%.3f' % isom_cal)[1:]} & {('%.3f' % isom_em_cal)[1:]} & {format_percentages(error_reduction_percentage(isom_cal, isom_em_cal))}\\%"
+            f"& {('%.3f' % isom_ref)[1:]} & {('%.3f' % isom_em_ref)[1:]} & {format_percentages(error_reduction_percentage(isom_ref, isom_em_ref))}\\% \\\\ \n \\cline{{2-14}}"
         )
         buffer.write("\n\\cline{2-14}\n")
     averages = dict(map(lambda el: (el[0], np.mean(el[1])), averages.items()))
     buffer.write(
-        f"& Avg & {averages['nae']:.3f} & {averages['em_nae']:.3f} & {format_percentages(error_reduction_percentage(averages['nae'], averages['em_nae']))}\\%"
-        f"& {averages['brier']:.3f} & {averages['em_brier']:.3f} & {format_percentages(error_reduction_percentage(averages['brier'], averages['em_brier']))}\\%"
-        f"& {averages['isom_cal']:.3f} & {averages['isom_em_cal']:.3f} & {format_percentages(error_reduction_percentage(averages['isom_cal'], averages['isom_em_cal']))}\\%"
-        f"& {averages['isom_ref']:.3f} & {averages['isom_em_ref']:.3f} & {format_percentages(error_reduction_percentage(averages['isom_ref'], averages['isom_em_ref']))}\\% \\\\"
+        f"& \\cellcolor[gray]{{.65}}Avg & {('%.3f' % averages['nae'])[1:]} & {('%.3f' % averages['em_nae'])[1:]} & {format_percentages(error_reduction_percentage(averages['nae'], averages['em_nae']))}\\%"
+        f"& {('%.3f' % averages['brier'])[1:]} & {('%.3f' % averages['em_brier'])[1:]} & {format_percentages(error_reduction_percentage(averages['brier'], averages['em_brier']))}\\%"
+        f"& {('%.3f' % averages['isom_cal'])[1:]} & {('%.3f' % averages['isom_em_cal'])[1:]} & {format_percentages(error_reduction_percentage(averages['isom_cal'], averages['isom_em_cal']))}\\%"
+        f"& {('%.3f' % averages['isom_ref'])[1:]} & {('%.3f' % averages['isom_em_ref'])[1:]} & {format_percentages(error_reduction_percentage(averages['isom_ref'], averages['isom_em_ref']))}\\% \\\\"
     )
     return averages
 
@@ -116,10 +122,10 @@ def write_overall_averages(calib_avg, non_calib_avg):
     isom_em_cal = avg(calib_avg['isom_em_cal'], non_calib_avg['isom_em_cal'])
     isom_ref = avg(calib_avg['isom_ref'], non_calib_avg['isom_ref'])
     isom_em_ref = avg(calib_avg['isom_em_ref'], non_calib_avg['isom_em_ref'])
-    return f"& {nae:.3f} & {em_nae:.3f} & {format_percentages(error_reduction_percentage(nae, em_nae))}\\%" \
-           f"& {brier:.3f} & {em_brier:.3f} & {format_percentages(error_reduction_percentage(brier, em_brier))}\\%" \
-           f"& {isom_cal:.3f} & {isom_em_cal:.3f} & {format_percentages(error_reduction_percentage(brier, em_brier))}\\%" \
-           f"& {isom_ref:.3f} & {isom_em_ref:.3f} & {format_percentages(error_reduction_percentage(isom_ref, isom_em_ref))}\\% \\\\"
+    return f"& {('%.3f' % nae)[1:]} & {('%.3f' % em_nae)[1:]} & {format_percentages(error_reduction_percentage(nae, em_nae))}\\%" \
+           f"& {('%.3f' % brier)[1:]} & {('%.3f' % em_brier)[1:]} & {format_percentages(error_reduction_percentage(brier, em_brier))}\\%" \
+           f"& {('%.3f' % isom_cal)[1:]} & {('%.3f' % isom_em_cal)[1:]} & {format_percentages(error_reduction_percentage(brier, em_brier))}\\%" \
+           f"& {('%.3f' % isom_ref)[1:]} & {('%.3f' % isom_em_ref)[1:]} & {format_percentages(error_reduction_percentage(isom_ref, isom_em_ref))}\\% \\\\"
 
 
 if __name__ == '__main__':
@@ -157,3 +163,4 @@ if __name__ == '__main__':
         print(template.substitute(nocalib_results=non_calibrated_latex, calib_results=calibrated_latex, overall_avg=overall_avg))
 
 
+    # TODO fare binning per drift. [0-0.25, 0.25-0.5, 0.5-0.75, 0.75-1]

@@ -114,7 +114,7 @@ def get_measures_from_singlehist_measures(measures: [MeasureSingleHistory]) -> M
     )
 
 
-def get_measures_mean_across_iterations(iteration_measures: [Measures], filters: [str] = None) -> Measures:
+def get_measures_mean_across_experiments(experiment_measures: [Measures], filters: [str] = None) -> Measures:
     def pad_data(measures, field):
         padded = list()
         for elem in measures:
@@ -129,12 +129,12 @@ def get_measures_mean_across_iterations(iteration_measures: [Measures], filters:
             padded.append(pad)
         return np.array(padded)
 
-    max_len = max(len(elem.em_brier[1]) for elem in iteration_measures)
+    max_len = max(len(elem.em_brier[1]) for elem in experiment_measures)
 
     out = list()
     for field in Measures._fields:
         if filters is None or field in filters:
-            out.append((labels_dict[field], pad_data(iteration_measures, field).mean(axis=0)))
+            out.append((labels_dict[field], pad_data(experiment_measures, field).mean(axis=0)))
         else:
             out.append(None)
 

@@ -253,23 +253,15 @@ if __name__ == '__main__':
 
     ITERATIONS_NUMBER = 500
     N_CLASSES = 2
-    # N_CLASSES = int(sys.argv[1])
-    # class_name = sys.argv[2] if len(sys.argv) >= 3 else ""
-    # full_x_train, full_x_test, full_y_train, full_y_test, dataset_name = twentyng_dataset_by_class(class_name)
-    # for classifier in classifiers:
-    #     run_n_iterations_no_parallel(ITERATIONS_NUMBER, full_x_train, full_y_train, full_x_test, full_y_test, classifier, False,
-    #                                  dataset_name, N_CLASSES, class_name)
+
     rcv1_helper = Rcv1Helper()
     dataset_generator = rcv1_binary_dataset(rcv1_helper)
     with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
         for x, y, class_name in dataset_generator:
-            # TODO REMOVE THIS, IT'S JUST FOR NOW
-            if any(done == class_name for done in ['C11', 'C13', 'C151', 'C1511', 'C152', 'C171', 'C172', 'C181']):
-                continue
-            # TODO REMOVE ABOVE
-
-            if len((set_y := set(y))) != 2:
-                logging.error(f"Y has only one class! Set of labels: {set_y}; class: {class_name}")
+            if len((set_y := set(y))) != 2 or y.sum() < 2000:
+                logging.error(f"Y has only one class! Set of labels: {set_y}; class: {class_name}; OR y sum is lower than 2000")
             logging.info(f"Running experiment for class {class_name}")
             for classifier in classifiers:
                 run_n_iterations(ITERATIONS_NUMBER, x, y, classifier, False, "rcv1", p, N_CLASSES, class_name, 100)
+
+    # TODO testare con 5, 10, 20, 37. Per ognuno dei 500 samples, prendiamo 5/10/20 classi a caso
