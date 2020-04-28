@@ -1,8 +1,8 @@
 import pickle
 import numpy as np
 import logging
+import random
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.datasets import fetch_20newsgroups_vectorized, fetch_rcv1
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
@@ -12,10 +12,10 @@ from multiprocessing import Pool
 from data_generation import randomly_modify_prevalences
 from load_data import get_measures_from_singlehist_measures
 from datetime import date
-from dataset_helpers import take, rcv1_binary_dataset, Rcv1Helper
+from dataset_helpers import take, Rcv1Helper
 
 from em import em
-logging.basicConfig(filename="computation.log", level=logging.INFO, format='%(levelname)s:%(message)s')
+logging.basicConfig(filename="computation.log", level=logging.INFO, format='%(asctime)s:%(message)s')
 
 
 def em_experiment(clf, X_tr, y_tr, X_te, y_te, multi_class=False):
@@ -49,90 +49,24 @@ def em_experiment(clf, X_tr, y_tr, X_te, y_te, multi_class=False):
     return measures
 
 
-# def run_experiment(batch_name, tr_prevalences, te_prevalences, classifier, y_min=0, y_max=1.0):
-#     name, clf = classifier
-#     # fig, axs = plt.subplots(len(tr_prevalences), len(te_prevalences))
-#     # fig.suptitle(name)
-#     # fig.set_size_inches(20, 20)
-#     # axs_iter = iter(axs.flat)
-#     for tr_pr in tr_prevalences:
-#         for te_pr in te_prevalences:
-#             # ax = next(axs_iter)
-#             pos_count = y.sum()
-#             neg_count = len(y) - pos_count
-#             tr_pos = int(pos_count * tr_pr / (tr_pr + te_pr))
-#             te_pos = pos_count - tr_pos
-#             tr_neg = int(tr_pos / tr_pr * (1 - tr_pr))
-#             te_neg = int(te_pos / te_pr * (1 - te_pr))
-#             if tr_neg + te_neg > neg_count:
-#                 factor = neg_count / (tr_neg + te_neg)
-#                 tr_neg = int(tr_neg * factor)
-#                 te_neg = neg_count - tr_neg
-#                 tr_pos = int(tr_pos * factor)
-#                 te_pos = int(te_pos * factor)
-#             tr_idx = list()
-#             for i in range(len(y)):
-#                 if y[i] == 1:
-#                     tr_idx.append(i)
-#                     if len(tr_idx) == tr_pos:
-#                         break
-#             for i in range(len(y)):
-#                 if y[i] == 0:
-#                     tr_idx.append(i)
-#                     if len(tr_idx) == tr_pos + tr_neg:
-#                         break
-#             te_idx = list()
-#             for i in range(len(y)):
-#                 if y[i] == 1 and i not in tr_idx:
-#                     te_idx.append(i)
-#                     if len(te_idx) == te_pos:
-#                         break
-#             for i in range(len(y)):
-#                 if y[i] == 0 and i not in tr_idx:
-#                     te_idx.append(i)
-#                     if len(te_idx) == te_pos + te_neg:
-#                         break
-#             X_tr = X[tr_idx]
-#             y_tr = y[tr_idx]
-#             X_te = X[te_idx]
-#             y_te = y[te_idx]
-#
-#             history = em_experiment(clf, X_tr, y_tr, X_te, y_te, y_min, y_max)
-#             with open(f'./pickles/{batch_name}_{name.replace(" ", "-")}_{round(tr_pr, 3)}_{round(te_pr, 3)}.pkl',
-#                       'wb') as f:
-#                 print("Saving file ", f.name)
-#                 pickle.dump((history, tr_pr, te_pr), f)
-
-def run_experiment(batch_name, cls, x_tr, y_tr, x_te, y_te):
-    name, cls = cls
-    history = em_experiment(cls, x_tr, y_tr, x_te, y_te)
-    with open(f'./pickles/{name.replace(" ", "-")}_{batch_name}.pkl', 'wb') as f:
-        print("Saving file ", f.name)
-        pickle.dump(history, f)
-
-
-def batch(batch_name, x_train, y_train, x_test, y_test):
-    classifiers = [#('Multinomial Bayes', MultinomialNB()),
-        #('Calibrated Multinomial Bayes', CalibratedClassifierCV(MultinomialNB(), ensemble=False)),
-        # ('Linear SVM', SVC(probability=True, kernel='linear')),
-        ('Calibrated Linear SVM', CalibratedClassifierCV(SVC(kernel='linear'), ensemble=False)),
-        ('Logistic Regression', LogisticRegression()),
-        ('Calibrated Logistic Regression', CalibratedClassifierCV(LogisticRegression(), ensemble=False)),
-        ('Random Forest', RandomForestClassifier()),
-        ('Calibrated Random Forest', CalibratedClassifierCV(RandomForestClassifier(), ensemble=False))]
-
-    with Pool(11) as p:
-        p.starmap(run_experiment, [(batch_name, cls, x_train, y_train, x_test, y_test) for cls in classifiers])
-
-
 def generate_n_randomly_modified_prevalence(n, x, y, train_sample, test_sample):
     for i in range(n):
         yield randomly_modify_prevalences(x, y, train_sample, test_sample)
 
 
-def run_n_iterations(n, x, y, classifier_name, multiclass, dataset_name, pool, n_classes, class_name="", take_n=50):
+def generate_n_randomly_prevalences_random_classes(n, rcv1_helper, n_classes, train_sample, test_sample):
+    for i in range(n):
+        classes = random.choices(list(rcv1_helper.hierarchical_single_label_indices_cached.keys()), k=n_classes)
+        indices = np.concatenate(list(rcv1_helper.hierarchical_single_label_indices_cached[c] for c in classes))
+        y_temp = rcv1_helper.target[indices]  # it seems like we cannot index indices, label_indices together
+        x, y = rcv1_helper.data[indices], y_temp[:, rcv1_helper.label_indices(classes)]
+        del y_temp
+        yield randomly_modify_prevalences(x, y, train_sample, test_sample)
+
+
+def run_n_iterations(n, rcv1_helper, classifier_name, multiclass, dataset_name, pool, n_classes, class_name="", take_n=50):
     logging.info(f"Running {n} iterations for classifier {classifier_name}")
-    gen = generate_n_randomly_modified_prevalence(n, x, y, 1000, 1000)
+    gen = generate_n_randomly_prevalences_random_classes(n, rcv1_helper, n_classes, 1000, 1000)
     measures = list()
     i = 0
     while data := take(take_n, gen):
@@ -152,74 +86,6 @@ def run_n_iterations(n, x, y, classifier_name, multiclass, dataset_name, pool, n
     logging.info(f"Saving measures for classifier {classifier_name}")
     with open(f'./pickles/measures_new_experiments/measures_{n}_{dataset_name}{class_name}_{n_classes}_{classifier_name.replace(" ", "-")}_{date.today().strftime("%d-%m-%y")}.pkl', 'wb') as f:
         pickle.dump(measures, f)
-
-
-def run_n_iterations_no_parallel(n, x_train, y_train, x_test, y_test, classifier, multiclass, dataset_name, n_classes, class_name=""):
-    classifier_name, classifier = classifier
-    logging.info(f"Running {n} iterations for classifier {classifier_name}")
-    gen = generate_n_randomly_modified_prevalence(n, x_train, y_train, x_test, y_test, 7000, 10000)
-    measures = list()
-
-    for i, ((new_xtr, new_ytr), (new_xte, new_yte)) in enumerate(gen):
-        logging.info(f"Processing subsample {i+1}-{n}")
-        measures.append(em_experiment(classifier, new_xtr, new_ytr, new_xte, new_yte, multiclass))
-
-    logging.info(f"Saving measures for classifier {classifier_name}")
-    with open(f'./pickles/measures/measures_{n}_{dataset_name}{class_name}_{n_classes}_{classifier_name.replace(" ", "-")}_{date.today().strftime("%d-%m-%y")}.pkl', 'wb') as f:
-        pickle.dump(measures, f)
-
-
-def rcv1_dataset():
-    dataset = fetch_rcv1()
-    index_class = list(dataset.target_names).index(index)
-    y = np.asarray(dataset.target[:, index_class].todense()).squeeze()
-    x_train, x_test = dataset.data[:23149], dataset.data[23149:]
-    y_train, y_test = y[:23149], y[23149:]
-    return x_train, x_test, y_train, y_test, "rcv1"
-
-
-def twentyng_dataset_by_class(top_class):
-    train_set = fetch_20newsgroups_vectorized(subset='train')
-    test_set = fetch_20newsgroups_vectorized(subset='test')
-    indices = []
-    for i, class_ in enumerate(train_set.target_names):
-        if top_class == class_.split('.')[0]:
-            indices.append(i)
-    y_train = np.where(np.isin(train_set.target, indices), 1, 0)
-    y_test = np.where(np.isin(test_set.target, indices), 1, 0)
-    return train_set.data, test_set.data, y_train, y_test, "20ng"
-
-
-def twentyng_dataset(n_classes=-1, seed=None):
-    def to_n_classes(arr, labels):
-        # Summation of boolean arrays works as a logical OR
-        mask = np.array(sum(x for x in [arr == i for i in labels]))
-        return np.where(mask, arr, np.zeros_like(arr))
-
-    train_set = fetch_20newsgroups_vectorized(subset='train')
-    test_set = fetch_20newsgroups_vectorized(subset='test')
-    if n_classes < 2:
-        return train_set.data, test_set.data, train_set.target, test_set.target, "20ng"
-
-    # Given a number N of desired output classes, we take N-1 random ints between 0 and 19 (20ng has 20 classes).
-    # These will be our output classes. We zero out all other classes in the target array, and keep the selected
-    # classes only. Eg. in the binary case, N=2, we take N-1=1 class which will be our positives, whereas the 0s will
-    # be our negatives.
-    np.random.seed(seed)
-    train_target = train_set.target
-    test_target = test_set.target
-    labels = np.random.choice(20, n_classes, replace=False)
-
-    train_target = to_n_classes(train_target, labels)
-    test_target = to_n_classes(test_target, labels)
-
-    # We convert labels so that they are incremental ids (eg. 0, 1, 2) instead of keeping the original labels.
-    # This is for convenience of function which will later process these labels
-    for i, label in enumerate(sorted(labels)):
-        train_target[train_target == label] = i
-        test_target[test_target == label] = i
-
-    return train_set.data, test_set.data, train_target, test_target, "20ng"
 
 
 def init_classifiers(name):
@@ -252,16 +118,9 @@ if __name__ == '__main__':
     ]
 
     ITERATIONS_NUMBER = 500
-    N_CLASSES = 2
 
     rcv1_helper = Rcv1Helper()
-    dataset_generator = rcv1_binary_dataset(rcv1_helper)
     with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
-        for x, y, class_name in dataset_generator:
-            if len((set_y := set(y))) != 2 or y.sum() < 2000:
-                logging.error(f"Y has only one class! Set of labels: {set_y}; class: {class_name}; OR y sum is lower than 2000")
-            logging.info(f"Running experiment for class {class_name}")
+        for n_classes in [5, 10, 20, 37]:
             for classifier in classifiers:
-                run_n_iterations(ITERATIONS_NUMBER, x, y, classifier, False, "rcv1", p, N_CLASSES, class_name, 100)
-
-    # TODO testare con 5, 10, 20, 37. Per ognuno dei 500 samples, prendiamo 5/10/20 classi a caso
+                run_n_iterations(ITERATIONS_NUMBER, rcv1_helper, classifier, n_classes > 2, "rcv1", p, n_classes, "", 100)

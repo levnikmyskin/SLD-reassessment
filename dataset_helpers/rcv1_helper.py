@@ -10,11 +10,18 @@ class Rcv1Helper:
         self.dataset = dataset if dataset is not None else fetch_rcv1()
         self.parent_hierarchy, self.children_hierarchy = self.__get_rcv1_hierarchy()
         self.csc_target = csc_matrix(self.dataset.target)  # This will improve speed for single-label indices
+        self._hierarchical_single_label_indices = None
 
-    def is_root(self, label):
+    @property
+    def hierarchical_single_label_indices_cached(self) -> {str: np.array}:
+        if self._hierarchical_single_label_indices is None:
+            self._hierarchical_single_label_indices = dict(self.hierarchical_single_labels_indices())
+        return self._hierarchical_single_label_indices
+
+    def is_root(self, label) -> bool:
         return len(self.parents(label)) == 0
 
-    def is_leaf(self, label):
+    def is_leaf(self, label) -> bool:
         return len(self.children(label)) == 0
 
     def parents(self, label) -> [str]:
@@ -23,7 +30,7 @@ class Rcv1Helper:
     def children(self, label) -> {str}:
         return self.children_hierarchy[label]
 
-    def label_indices(self, labels: [str]):
+    def label_indices(self, labels: [str]) -> [int]:
         target_names = list(self.dataset.target_names)
         return [target_names.index(label) for label in labels]
 
