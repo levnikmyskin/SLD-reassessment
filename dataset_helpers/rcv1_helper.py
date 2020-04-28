@@ -1,6 +1,7 @@
 import re
 import numpy as np
 from sklearn.datasets import fetch_rcv1
+from scipy.sparse import csc_matrix
 
 
 class Rcv1Helper:
@@ -8,6 +9,7 @@ class Rcv1Helper:
     def __init__(self, dataset=None):
         self.dataset = dataset if dataset is not None else fetch_rcv1()
         self.parent_hierarchy, self.children_hierarchy = self.__get_rcv1_hierarchy()
+        self.csc_target = csc_matrix(self.dataset.target)  # This will improve speed for single-label indices
 
     def is_root(self, label):
         return len(self.parents(label)) == 0
@@ -89,9 +91,8 @@ class Rcv1Helper:
 
         # First filter out all rows which have more or less than our desired number of labels
         # then take only those which have exactly our desired labels
-        filtered_rows, _ = np.where(np.sum(self.dataset.target, axis=1) == len(target_indices))
-        filtered_rows = self.dataset.target[filtered_rows]
-        return np.where(np.asarray((filtered_rows[:, target_indices] == 1).todense()).all(axis=1))
+        return np.logical_and(self.csc_target.sum(axis=1) == len(target_indices),
+                              self.csc_target[:, target_indices].sum(axis=1) == len(target_indices)).nonzero()
 
     def __get_rcv1_hierarchy(self):
         def get_parents(label, hier, parents):

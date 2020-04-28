@@ -51,3 +51,5 @@ def rcv1_binary_dataset(rcv1_helper, minimum_examples=2000):
     del single_label_dict, single_label_indices
     for index in class_indices:
         yield data, np.asarray(target[:, index].todense()).squeeze(), rcv1_helper.target_names[index]
+
+
