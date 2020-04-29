@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 import logging
-import random
+from scipy.sparse import csc_matrix
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -18,8 +18,8 @@ from em import em
 logging.basicConfig(filename="computation.log", level=logging.INFO, format='%(asctime)s:%(message)s')
 
 
-def em_experiment(clf, X_tr, y_tr, X_te, y_te, multi_class=False):
-    mlb = MultiLabelBinarizer()
+def em_experiment(clf, X_tr, y_tr, X_te, y_te, n_classes, multi_class=False):
+    mlb = MultiLabelBinarizer(classes=range(n_classes))
     mlb.fit(np.expand_dims(np.hstack((y_tr, y_te)), 1))
     y_tr_bin = mlb.transform(np.expand_dims(y_tr, 1))
     y_te_bin = mlb.transform(np.expand_dims(y_te, 1))
@@ -56,10 +56,19 @@ def generate_n_randomly_modified_prevalence(n, x, y, train_sample, test_sample):
 
 def generate_n_randomly_prevalences_random_classes(n, rcv1_helper, n_classes, train_sample, test_sample):
     for i in range(n):
-        classes = random.choices(list(rcv1_helper.hierarchical_single_label_indices_cached.keys()), k=n_classes)
-        indices = np.concatenate(list(rcv1_helper.hierarchical_single_label_indices_cached[c] for c in classes))
-        y_temp = rcv1_helper.target[indices]  # it seems like we cannot index indices, label_indices together
-        x, y = rcv1_helper.data[indices], y_temp[:, rcv1_helper.label_indices(classes)]
+        hierarchical_sli = dict(filter(lambda kv: kv[1].shape[0] >= 2000,
+                                       rcv1_helper.hierarchical_single_label_indices_cached.items()))
+
+        classes = np.random.default_rng().choice(list(hierarchical_sli.keys()),
+                                                 size=n_classes, replace=False)
+        indices = np.concatenate(list(hierarchical_sli[c] for c in classes))
+        y_temp = csc_matrix(rcv1_helper.target[indices])
+        y = np.zeros(y_temp.shape[0], dtype=int)
+        target_names = list(rcv1_helper.target_names)
+        for j, label in enumerate(rcv1_helper.sort_labels(classes)):
+            ind = rcv1_helper.single_label_indices(label, target_names, y_temp)[0]
+            y[ind] = j
+        x = rcv1_helper.data[indices]
         del y_temp
         yield randomly_modify_prevalences(x, y, train_sample, test_sample)
 
@@ -77,7 +86,7 @@ def run_n_iterations(n, rcv1_helper, classifier_name, multiclass, dataset_name, 
         # object. We can save these to disk, and later compute a mean with the appropriate function in load_data.py
         measures.append(pool.starmap(
             em_experiment,
-            [(classifier_name, new_xtr, new_ytr, new_xte, new_yte, multiclass) for new_xtr, new_ytr, new_xte, new_yte in
+            [(classifier_name, new_xtr, new_ytr, new_xte, new_yte, n_classes, multiclass) for new_xtr, new_ytr, new_xte, new_yte in
              data],
             take_n // 10
         ))
@@ -122,5 +131,6 @@ if __name__ == '__main__':
     rcv1_helper = Rcv1Helper()
     with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
         for n_classes in [5, 10, 20, 37]:
+            logging.info(f"Running single-label experiments with {n_classes} classes")
             for classifier in classifiers:
                 run_n_iterations(ITERATIONS_NUMBER, rcv1_helper, classifier, n_classes > 2, "rcv1", p, n_classes, "", 100)

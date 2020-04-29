@@ -29,7 +29,11 @@ def randomly_modify_prevalences(x: np.array, y: np.array, train_split=1000, test
     test_groups = [(y_test == label).nonzero()[0] for label in labels]
     new_test_sample = __new_random_sample(test_groups, len(labels), test_split)
 
-    return x[new_training_sample], y[new_training_sample], x_test[new_test_sample], y_test[new_test_sample]
+    x_tr, y_tr, x_te, y_te = x[new_training_sample], y[new_training_sample], x_test[new_test_sample], y_test[new_test_sample]
+    if len(set(y_tr)) < len(labels):
+        return randomly_modify_prevalences(x, y, train_split, test_split)
+
+    return x_tr, y_tr, x_te, y_te
 
 
 def subsample_dataset_random_prev(dataset, sample_length: int) -> ((np.array, np.array), (np.array, np.array)):

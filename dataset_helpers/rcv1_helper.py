@@ -30,6 +30,9 @@ class Rcv1Helper:
     def children(self, label) -> {str}:
         return self.children_hierarchy[label]
 
+    def sort_labels(self, labels: [str]):
+        return sorted(labels, key=lambda x: len(self.parents(x)), reverse=True)
+
     def label_indices(self, labels: [str]) -> [int]:
         target_names = list(self.dataset.target_names)
         return [target_names.index(label) for label in labels]
@@ -66,7 +69,7 @@ class Rcv1Helper:
         target_names = list(self.dataset.target_names)
         single_labels = {}
         for label in self.parent_hierarchy.keys():
-            indices = self.__single_label_indices(label, target_names)
+            indices = self.single_label_indices(label, target_names, self.csc_target)
             single_labels[label] = indices[0].shape[0]
 
         # Add to parents the count of their children
@@ -87,19 +90,19 @@ class Rcv1Helper:
         """
         target_names = list(self.dataset.target_names)
         if label:
-            yield label, self.__single_label_indices(label, target_names)[0]
+            yield label, self.single_label_indices(label, target_names, self.csc_target)[0]
         else:
             for label in self.parent_hierarchy.keys():
-                yield label, self.__single_label_indices(label, target_names)[0]
+                yield label, self.single_label_indices(label, target_names, self.csc_target)[0]
 
-    def __single_label_indices(self, label, target_names):
+    def single_label_indices(self, label, target_names, target):
         parents = self.parents(label)
         target_indices = [target_names.index(l) for l in [label] + parents]
 
         # First filter out all rows which have more or less than our desired number of labels
         # then take only those which have exactly our desired labels
-        return np.logical_and(self.csc_target.sum(axis=1) == len(target_indices),
-                              self.csc_target[:, target_indices].sum(axis=1) == len(target_indices)).nonzero()
+        return np.logical_and(target.sum(axis=1) == len(target_indices),
+                              target[:, target_indices].sum(axis=1) == len(target_indices)).nonzero()
 
     def __get_rcv1_hierarchy(self):
         def get_parents(label, hier, parents):
