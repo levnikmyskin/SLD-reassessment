@@ -8,10 +8,9 @@ import string
 import os
 import re
 
-PICKLES_PATH = "./pickles/measures/esuli"
+PICKLES_PATH = "./pickles/measures_new_experiments"
 
 # TODO LOW DRIFT HIGH DRIFT ECC
-# TODO WRITE FLOATS AS .N NOT 0.N
 
 
 def normalized_absolute_error(train_pr, test_pr):
@@ -23,7 +22,7 @@ def normalized_absolute_error(train_pr, test_pr):
 
 
 def load_measure_for_classifiers_pickles(dataset_name, n_classes, with_file_name=False):
-    pattern = re.compile(r'measures_(?P<n_iter>\d+)_(?P<dataset_name>.+)_(?P<n_classes>(2|5|10|20))_(?P<clf>[\w-]+)_(?P<date>[\d-]+)')
+    pattern = re.compile(r'measures_(?P<n_iter>\d+)_(?P<dataset_name>.+)_(?P<n_classes>(2|5|10|20|37))_(?P<clf>[\w-]+)_(?P<date>[\d-]+)')
     files = os.listdir(PICKLES_PATH)
     for file in filter(lambda f: dataset_name in f, files):
         m = pattern.match(file)
@@ -128,6 +127,23 @@ def write_overall_averages(calib_avg, non_calib_avg):
            f"& {('%.3f' % isom_ref)[1:]} & {('%.3f' % isom_em_ref)[1:]} & {format_percentages(error_reduction_percentage(isom_ref, isom_em_ref))}\\% \\\\"
 
 
+def binning_by_drift(loaded_measures):
+    bins = {bin_: [] for bin_ in np.arange(0., 1., step=0.25)}
+    for clf, measures in loaded_measures:
+        print(f"Binning measures for classifier {clf}")
+        for measure in measures:
+            nae = normalized_absolute_error(measure.train_priors[1][0], measure.test_priors[1][0])
+            if 0. <= nae <= 0.25:
+                bins[0].append(measure)
+            elif 0.25 < nae <= 0.5:
+                bins[0.25].append(measure)
+            elif 0.5 < nae <= 0.75:
+                bins[0.5].append(measure)
+            else:
+                bins[0.75].append(measure)
+    return bins
+
+
 if __name__ == '__main__':
     dataset = sys.argv[1]
     n_classes = sys.argv[3]
@@ -140,7 +156,7 @@ if __name__ == '__main__':
 
     template = string.Template(template)
     groups = itertools.groupby(sorted(measures, key=lambda el: "Calibrated" in el[0]), key=lambda el: "Calibrated" in el[0])
-    non_calibrated, calibrated = list(next(groups)[1]), list(next(groups)[1])
+    non_calibrated, calibrated = sorted(next(groups)[1], key=lambda k: k[0]), sorted(next(groups)[1], key=lambda k: k[0])
 
     with io.StringIO() as buffer:
         non_calib_averages = write_latex_table(buffer, non_calibrated, isomerous)

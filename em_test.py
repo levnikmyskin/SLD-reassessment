@@ -40,11 +40,11 @@ def em_experiment(clf, X_tr, y_tr, X_te, y_te, n_classes, multi_class=False):
     em_test_posteriors, em_test_priors, history = em(y_te, test_posteriors, train_priors, multi_class=multi_class)
     measures = get_measures_from_singlehist_measures(history)
 
-    # print('Results')
-    # print('prior from:   train test  post  em')
-    # for i, (a, b, c, d) in enumerate(
-    #         zip(train_priors, test_priors, posteriors_test_priors, em_test_priors)):
-    #     print(f'{i:11d} - {a:3.3f} {b:3.3f} {c:3.3f} {d:3.3f}')
+    print('Results')
+    print('prior from:   train test  post  em')
+    for i, (a, b, c, d) in enumerate(
+            zip(train_priors, test_priors, posteriors_test_priors, em_test_priors)):
+        print(f'{i:11d} - {a:3.3f} {b:3.3f} {c:3.3f} {d:3.3f}')
 
     return measures
 
@@ -129,8 +129,8 @@ if __name__ == '__main__':
     ITERATIONS_NUMBER = 500
 
     rcv1_helper = Rcv1Helper()
-    with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
-        for n_classes in [5, 10, 20, 37]:
-            logging.info(f"Running single-label experiments with {n_classes} classes")
-            for classifier in classifiers:
+    for n_classes in [37]:
+        logging.info(f"Running single-label experiments with {n_classes} classes")
+        for classifier in classifiers:
+            with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
                 run_n_iterations(ITERATIONS_NUMBER, rcv1_helper, classifier, n_classes > 2, "rcv1", p, n_classes, "", 100)

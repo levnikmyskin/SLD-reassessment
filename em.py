@@ -83,7 +83,7 @@ def em(y, posteriors_zero, priors_zero, epsilon=1e-6, multi_class=False):
     val = 2 * epsilon
     history = list()
     history.append(get_measures_single_history(History(posteriors_zero, priors_zero, y, s, 1), multi_class))
-    logging.debug(f"Starting EM computation, multiclass: {multi_class}")
+    print(f"Starting EM computation, multiclass: {multi_class}")
     while not val < epsilon and s < 999:
         # M step
         priors_s_minus_one = priors_s.copy()
