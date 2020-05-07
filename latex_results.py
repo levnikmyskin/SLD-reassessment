@@ -10,6 +10,11 @@ import re
 
 PICKLES_PATH = "./pickles/measures_new_experiments"
 
+LR_KEY = "Logistic-Regression"
+RF_KEY = "Random-Forest"
+MNB_KEY = "Multinomial-Bayes"
+SVM_KEY = "Calibrated-Linear-SVM"
+
 # TODO LOW DRIFT HIGH DRIFT ECC
 
 
@@ -180,3 +185,4 @@ if __name__ == '__main__':
 
 
     # TODO fare binning per drift. [0-0.25, 0.25-0.5, 0.5-0.75, 0.75-1]
+    # TODO fare binning anche per quartili

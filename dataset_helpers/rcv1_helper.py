@@ -1,4 +1,5 @@
 import re
+import functools
 import numpy as np
 from sklearn.datasets import fetch_rcv1
 from scipy.sparse import csc_matrix
@@ -10,13 +11,10 @@ class Rcv1Helper:
         self.dataset = dataset if dataset is not None else fetch_rcv1()
         self.parent_hierarchy, self.children_hierarchy = self.__get_rcv1_hierarchy()
         self.csc_target = csc_matrix(self.dataset.target)  # This will improve speed for single-label indices
-        self._hierarchical_single_label_indices = None
 
-    @property
+    @functools.cached_property
     def hierarchical_single_label_indices_cached(self) -> {str: np.array}:
-        if self._hierarchical_single_label_indices is None:
-            self._hierarchical_single_label_indices = dict(self.hierarchical_single_labels_indices())
-        return self._hierarchical_single_label_indices
+        return dict(self.hierarchical_single_labels_indices())
 
     def is_root(self, label) -> bool:
         return len(self.parents(label)) == 0
