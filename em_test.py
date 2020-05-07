@@ -7,15 +7,17 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from multiprocessing import Pool
 from data_generation import randomly_modify_prevalences
 from load_data import get_measures_from_singlehist_measures
 from datetime import date
-from dataset_helpers import take, Rcv1Helper
-
+from dataset_helpers import take, Rcv1Helper, rcv1_binary_dataset
 from em import em
+
 logging.basicConfig(filename="computation.log", level=logging.INFO, format='%(asctime)s:%(message)s')
+ITERATIONS_NUMBER = 500
 
 
 def em_experiment(clf, X_tr, y_tr, X_te, y_te, n_classes, multi_class=False):
@@ -112,6 +114,32 @@ def init_classifiers(name):
         return LogisticRegression()
     elif name == 'Calibrated Logistic Regression':
         return CalibratedClassifierCV(LogisticRegression(), ensemble=False)
+    elif name == 'MultiLayerPerceptron':
+        return MLPClassifier(hidden_layer_sizes=(10000,))
+    elif name == 'Calibrated MultiLayerPerceptron':
+        return CalibratedClassifierCV(MLPClassifier(hidden_layer_sizes=(10000,)), ensemble=False)
+
+
+def single_label_experiments():
+    rcv1_helper = Rcv1Helper()
+    for n_classes in [37]:
+        logging.info(f"Running single-label experiments with {n_classes} classes")
+        for classifier in classifiers:
+            with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
+                run_n_iterations(ITERATIONS_NUMBER, rcv1_helper, classifier, n_classes > 2, "rcv1", p, n_classes, "", 100)
+
+
+def binary_experiments():
+    rcv1_helper = Rcv1Helper()
+    binary_dataset = rcv1_binary_dataset(rcv1_helper)
+    n_classes = 2
+    classifiers = ['MultiLayerPerceptron', 'Calibrated MultiLayerPerceptron']
+
+    for x, y, class_name in binary_dataset:
+        logging.info(f"Running experiments for class {class_name}")
+        for classifier in classifiers:
+            with Pool(11) as p:
+                run_n_iterations(ITERATIONS_NUMBER, rcv1_helper, classifier, False, "rcv1", p, n_classes, class_name, 100)
 
 
 if __name__ == '__main__':
@@ -126,11 +154,3 @@ if __name__ == '__main__':
         'Calibrated Logistic Regression'
     ]
 
-    ITERATIONS_NUMBER = 500
-
-    rcv1_helper = Rcv1Helper()
-    for n_classes in [37]:
-        logging.info(f"Running single-label experiments with {n_classes} classes")
-        for classifier in classifiers:
-            with Pool(11, maxtasksperchild=ITERATIONS_NUMBER // 10) as p:
-                run_n_iterations(ITERATIONS_NUMBER, rcv1_helper, classifier, n_classes > 2, "rcv1", p, n_classes, "", 100)
