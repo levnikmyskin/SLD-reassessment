@@ -1,6 +1,8 @@
 plots
 pickles
 .ipynb_checkpoints
+.idea
+__pycache__
 *.png
 *.pkl
 *.tex
