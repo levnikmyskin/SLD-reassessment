@@ -75,8 +75,8 @@ def plot_calibrated_percentiles(measures, extract_data_fn, axs, percent, n_class
     # Transform from {'BS': [.x, .x, .x, .x] ...} to {'BS': {'0': .x, '1': .x, ...}, 'CE': ...}'
     collected = list(map(lambda l: dict((k, {f'{j}': val for j, val in enumerate(v)}) for k, v in l.items()), calib.values()))
     df = pd.io.json.json_normalize(collected).mean().values
-    axs[0].plot(x, df[:4], 'k--', label='Average of learners')
-    axs[1].plot(x, df[4:8], 'k--', label='Average of learners')
+    axs[0].plot(x, df[:4], 'k--', label='Average of the 4 learners')
+    axs[1].plot(x, df[4:8], 'k--', label='Average of the 4 learners')
 
 
 def __extract_percentiles_data(extracted_data, percent, isomerous):
@@ -227,39 +227,48 @@ def extract_binary_data(measures):
 
 
 if __name__ == '__main__':
-    quartiles_data = [[] for _ in range(5)]
-    for n_classes in ("2", "5", "10", "20", "37"):
-        measures_gen = load_measure_for_classifiers_pickles("rcv1", n_classes)
-        if n_classes == "2":
-            data = table_min_max_quartiles(measures_gen, extract_binary_data)
-        else:
-            data = table_min_max_quartiles(measures_gen, lambda m: m)
-        for j, d in enumerate(data):
-            quartiles_data[j].append(d)
-
-    with open('quartiles_template.tex', 'r') as f:
-        template = string.Template(f.read())
-
-    print(template.substitute(
-        first_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[0] for v in (i['min'], i['max'])),
-        second_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[1] for v in (i['min'], i['max'])),
-        third_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[2] for v in (i['min'], i['max'])),
-        fourth_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[3] for v in (i['min'], i['max'])),
-    ))
-    # fig, axs = plt.subplots(nrows=5, ncols=2, sharex=True, sharey=False, figsize=(15, 22))
-    # axs[0, 0].set_title('Reduction in Brier Score')
-    # axs[0, 1].set_title('Reduction in Calibration Error')
-    # axs[len(axs) - 1, 0].set_xlabel('Quartiles')
-    # axs[len(axs) - 1, 1].set_xlabel('Quartiles')
-    # for i, n_classes in enumerate(("2", "5", "10", "20", "37")):
-    # # for i, n_classes in enumerate(("5",)):
-    #     print(f"Computing measures and plotting for {n_classes} classes")
+    # quartiles_data = [[] for _ in range(5)]
+    # for n_classes in ("2", "5", "10", "20", "37"):
     #     measures_gen = load_measure_for_classifiers_pickles("rcv1", n_classes)
-    #     if n_classes == '2':
-    #         plot_calibrated_percentiles(measures_gen, extract_binary_data, [axs[i, 0], axs[i, 1]], 0.25, n_classes)
+    #     if n_classes == "2":
+    #         data = table_min_max_quartiles(measures_gen, extract_binary_data)
     #     else:
-    #         plot_calibrated_percentiles(measures_gen, lambda m: m, [axs[i, 0], axs[i, 1]], 0.25, n_classes)
+    #         data = table_min_max_quartiles(measures_gen, lambda m: m)
+    #     for j, d in enumerate(data):
+    #         quartiles_data[j].append(d)
     #
-    # axs[0, 1].legend(loc='lower right')
-    # fig.tight_layout()
-    # fig.savefig('quartiles.pdf')
+    # with open('quartiles_template.tex', 'r') as f:
+    #     template = string.Template(f.read())
+    #
+    # print(template.substitute(
+    #     first_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[0] for v in (i['min'], i['max'])),
+    #     second_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[1] for v in (i['min'], i['max'])),
+    #     third_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[2] for v in (i['min'], i['max'])),
+    #     fourth_quartile=" & ".join(f"{v:.3f}" for i in quartiles_data[3] for v in (i['min'], i['max'])),
+    # ))
+    fig, axs = plt.subplots(nrows=5, ncols=2, sharex=True, sharey=False, figsize=(15, 22))
+    axs[0, 0].set_title('Reduction in Brier Score')
+    axs[0, 1].set_title('Reduction in Calibration Error')
+    axs[len(axs) - 1, 0].set_xlabel('Quartiles')
+    axs[len(axs) - 1, 1].set_xlabel('Quartiles')
+    for i, n_classes in enumerate(("2", "5", "10", "20", "37")):
+        print(f"Computing measures and plotting for {n_classes} classes")
+        measures_gen = load_measure_for_classifiers_pickles("rcv1", n_classes)
+        if n_classes == '2':
+            plot_calibrated_percentiles(measures_gen, extract_binary_data, [axs[i, 0], axs[i, 1]], 0.25, n_classes)
+        else:
+            plot_calibrated_percentiles(measures_gen, lambda m: m, [axs[i, 0], axs[i, 1]], 0.25, n_classes)
+
+    axs[0, 1].legend(loc='lower right')
+    fig.tight_layout()
+    fig.savefig('quartiles.pdf')
+
+
+
+# TODO plot con le prior vere per train e test + curva per priors per MLE e EMQ (per il binario)
+# TODO figura in basso con le varie misure d'errore.
+# TODO due run, a sinistra funziona bene e a destra funziona male
+# TODO tabella con prevalence nel training e metriche  priorità bassa
+
+# TODO poter scegliere una classe fra le varie disponibili
+# TODO qualcosa su iterazioni di EM, quanto ci vuole in media per convergere ecc.   priorità alta

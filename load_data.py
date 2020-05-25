@@ -23,6 +23,8 @@ labels_dict = dict(soft_acc='Soft accuracy', em_soft_acc='EM Soft acc.', soft_f1
                    isometric_em_ref_loss='Isomet. EM refin. loss', isometric_em_cal_loss='Isomet. EM cal. loss',
                    isomerous_em_ref_loss='Isomer. EM refin. loss', isomerous_em_cal_loss="Isomer. EM Cal. loss")
 
+jupyter_measures = dict(nae="NAE", bs="Brier score", ce="Calibration error", re="Refinement error")
+
 
 def load_em_history() -> [LoadedData]:
     pattern = re.compile(r'(?P<clf_name>([a-zA-Z\-]+))_(?P<dataset>.+)_(?P<it>\d+)_(?P<date>\d{2}-\d{2}-\d{2})')

@@ -23,7 +23,7 @@ def normalized_absolute_error(train_pr, test_pr):
         train_pr = np.array([1 - train_pr, train_pr])
     if type(test_pr) != np.ndarray:
         test_pr = np.array([1 - test_pr, test_pr])
-    return np.sum(np.abs(train_pr - test_pr)) / (2 * (1 - np.min(test_pr)))
+    return np.sum(np.abs(train_pr - test_pr)) / (2 * (1 - np.min(train_pr)))
 
 
 def load_measure_for_classifiers_pickles(dataset_name, n_classes, with_file_name=False):
@@ -92,8 +92,8 @@ def write_latex_table(buffer, measure, isomerous=True):
         classes_measures.append((clf_name, get_measures_mean_across_experiments(means)))
 
     for clf_name, measure_mean in classes_measures:
-        assert type(measure_mean) is Measures, f"Measure {i} for clf {clf_name} is not of type Measures. Got {measure_mean}"
-        shortened_name = ''.join(c for c in clf_name.replace('Calibrated', '') if c.isupper())  # shorten classifier name by taking the two capitalized letters
+        assert type(measure_mean) is Measures, f"Measure {i} for clf {clf_name} is not of type Measures. Got {type(measure_mean)}"
+        shortened_name = ''.join(c for c in clf_name.replace('Calibrated', '') if c.isupper())  # shorten classifier name by taking the capitalized letters
         nae, em_nae, brier, em_brier, isom_cal, isom_em_cal, isom_ref, isom_em_ref = get_latex_measures(measure_mean, isomerous)
         add_meas_to_averages(averages, nae, em_nae, brier, em_brier, isom_cal, isom_em_cal, isom_ref, isom_em_ref)
 
