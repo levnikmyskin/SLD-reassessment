@@ -1,4 +1,4 @@
-from em_test import fetch_20newsgroups_vectorized
+from sld_experiments import fetch_20newsgroups_vectorized
 import pandas as pd
 from dataset_helpers import Rcv1Helper
 
