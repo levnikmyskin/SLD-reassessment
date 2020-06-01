@@ -33,7 +33,7 @@ def add_trace_to_fig(fig, value, max_len, target_class, name):
             y=padded[:, target_class] if len(value.shape) > 1 else padded,
             mode='lines',
             name=name,
-            visible='legendonly',
+            visible=True,
             legendgroup=name,
             showlegend=True
         )
